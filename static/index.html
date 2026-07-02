@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Smart Resume Screening System</title>
+<style>
+  :root {
+    --bg: #f5f6fa;
+    --card: #ffffff;
+    --text: #1f2430;
+    --muted: #6b7280;
+    --border: #e2e5ea;
+    --accent: #4f46e5;
+    --green: #16a34a;
+    --green-bg: #dcfce7;
+    --red: #dc2626;
+    --red-bg: #fee2e2;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, Segoe UI, Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+  }
+  header {
+    padding: 32px 24px 8px;
+    text-align: center;
+  }
+  header h1 { margin: 0 0 4px; font-size: 28px; }
+  header p { margin: 0; color: var(--muted); }
+
+  main {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 24px;
+  }
+
+  form {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+  }
+  label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+  textarea, input[type="file"] {
+    width: 100%;
+    font: inherit;
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: #fff;
+  }
+  textarea {
+    resize: vertical;
+    min-height: 120px;
+    margin-bottom: 18px;
+  }
+  input[type="file"] { margin-bottom: 18px; }
+
+  button {
+    width: 100%;
+    padding: 12px;
+    font: inherit;
+    font-weight: 600;
+    color: #fff;
+    background: var(--accent);
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  button:disabled { opacity: 0.6; cursor: default; }
+
+  #status { text-align: center; margin: 16px 0; color: var(--muted); }
+
+  .result {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    margin-top: 16px;
+  }
+  .result-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 12px;
+  }
+  .filename { font-weight: 600; }
+  .score { font-size: 22px; font-weight: 700; color: var(--accent); }
+
+  .skills { margin-bottom: 10px; }
+  .skills .label { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+  .tag {
+    display: inline-block;
+    font-size: 13px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    margin: 0 6px 6px 0;
+  }
+  .tag.matched { color: var(--green); background: var(--green-bg); }
+  .tag.missing { color: var(--red); background: var(--red-bg); }
+
+  .explanation { color: var(--text); line-height: 1.5; margin-top: 10px; }
+  .experience { font-size: 13px; color: var(--muted); margin-top: 8px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Smart Resume Screening System</h1>
+  <p>Paste a job description, attach resumes, and get an instant match score.</p>
+</header>
+
+<main>
+  <form id="match-form">
+    <label for="job_description">Job Description</label>
+    <textarea id="job_description" name="job_description" placeholder="Paste the job description here..." required></textarea>
+
+    <label for="resumes">Resumes (.pdf, .docx, .txt)</label>
+    <input type="file" id="resumes" name="resumes" accept=".pdf,.docx,.txt" multiple required />
+
+    <button type="submit" id="submit-btn">Match Resumes</button>
+  </form>
+
+  <div id="status"></div>
+  <div id="results"></div>
+</main>
+
+<script>
+const form = document.getElementById("match-form");
+const statusEl = document.getElementById("status");
+const resultsEl = document.getElementById("results");
+const submitBtn = document.getElementById("submit-btn");
+
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+
+  resultsEl.innerHTML = "";
+  statusEl.textContent = "Matching resumes...";
+  submitBtn.disabled = true;
+
+  const formData = new FormData(form);
+  const response = await fetch("/match-resumes", { method: "POST", body: formData });
+
+  submitBtn.disabled = false;
+
+  if (!response.ok) {
+    const error = await response.json();
+    statusEl.textContent = "Error: " + error.detail;
+    return;
+  }
+
+  const results = await response.json();
+  statusEl.textContent = "";
+  results.forEach(renderResult);
+});
+
+function renderResult(r) {
+  const skillTags = (skills, className) =>
+    skills.length
+      ? skills.map(s => `<span class="tag ${className}">${s}</span>`).join("")
+      : `<span class="tag ${className}">None</span>`;
+
+  const card = document.createElement("div");
+  card.className = "result";
+  card.innerHTML = `
+    <div class="result-header">
+      <span class="filename">${r.filename}</span>
+      <span class="score">${r.match_score}/100</span>
+    </div>
+    <div class="skills">
+      <div class="label">Matched Skills</div>
+      ${skillTags(r.matched_skills, "matched")}
+    </div>
+    <div class="skills">
+      <div class="label">Missing Skills</div>
+      ${skillTags(r.missing_skills, "missing")}
+    </div>
+    <div class="explanation">${r.explanation}</div>
+    ${r.experience_years != null ? `<div class="experience">Estimated experience: ${r.experience_years} years</div>` : ""}
+  `;
+  resultsEl.appendChild(card);
+}
+</script>
+
+</body>
+</html>
